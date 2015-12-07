@@ -15,14 +15,8 @@ def lsc(m, n, d, sigma):
 	z = model.addVar(obj=1, vtype="C", name="z")
 
 	for j in range(m):
-		y[j] = model.addVar(obj=0, vtype="B", name="y[%s]"%j)
+		y[j] = model.addVar(obj=0, vtype="C", name="y[%s]"%j)
 
-	#d_ord[0] = [2.3, 2.5, 5.6, 6.7]
-
-	#for i in range(m):
-	#	coef = [1 for j in range(m)]
-	#	var = [y[j] for j in range(m)]
-	#	model.setObjective(LinExpr(coef,var), GRB.MINIMIZE)
 	model.update()
 
 	model.setObjective(z, GRB.MINIMIZE)
@@ -58,8 +52,8 @@ def get_ub0(d):
 	
 	for j in range(0, len(d)):
 		for i in range(0, len(d)):
-			if d[i,j] > max[j]:
-				max[j] = d[i,j]
+			if d[i][j] > max[j]:
+				max[j] = d[i][j]
 
 	return min(max)
 
@@ -145,20 +139,6 @@ def greedy_sc(d, D, h):
 			num_opened = num_opened + 1
 
 	return y_g, centers, centers2, num_opened, max_min_dist
-
-'''
-def find_best_center(centers, j, f): # pass current centers, client j, forbidden center f
-	min_dist = float('inf')
-	best_c = f
-	
-	for i in range(0, len(centers)):
-		c = centers[i]
-		if c != f and d[c][j] < min_dist:
-			min_dist = d[c][j]
-			best_c = c # find the best center to have client j re-allocated
-
-	return best_c
-'''
 
 def close_facility(d, centers, centers2, P):
 	# this is step 4!!
@@ -254,65 +234,73 @@ def bsearch(N, M, P, UB, D, d):
 				while UB < D[tail]:
 					tail = tail - 1
 
-'''
-def calc_distance(x, y):
-	return math.sqrt(math.pow((x[0]-y[0]),2) + math.pow((x[1]-y[1]),2))
-
-# Transforma em matriz de facility x cliente
-# Facility = linha
-# Cliente = coluna
-def transform_sc(v_fac, v_cli):
-
-	assert(len(v_fac) == len(v_cli))
-
-	d = np.zeros((len(v_fac),len(v_cli)))
-
-	for i in range(0,len(v_fac)):
-		for j in range(0,len(v_cli)):
-			d[i,j] = calc_distance(v_fac[i],v_cli[j])
-	
-	return d;
-
-'''
-
 def distance(x1, y1, x2, y2):
 	return math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
-def make_data(n):
-    # positions of the points in the plane
-    fac_x = [random.random() for i in range(n)]
-    fac_y = [random.random() for i in range(n)]
+def load_random_euclidean_data():
+	n = 200
+	p = 2
 
-    cli_x = [random.random() for i in range(n)]
-    cli_y = [random.random() for i in range(n)]
+	D = set()
+	# positions of the points in the plane
+	fac_x = [random.random() for i in range(n)]
+	fac_y = [random.random() for i in range(n)]
+	cli_x = [random.random() for i in range(n)]
+	cli_y = [random.random() for i in range(n)]
 
-    c = np.zeros((n,n))
-    max_c = 0
-    for i in range(n):
-        for j in range(n):
-            c[i][j] = distance(fac_x[i],cli_x[i],fac_y[j],cli_y[j])
-            max_c = max(c[i,j],max_c)
+	d = np.zeros((n,n))
+	
+	for i in range(n):
+		for j in range(n):
+			d[i][j] = distance(fac_x[i],cli_x[i],fac_y[j],cli_y[j])
+			D.add(d[i,j])
+	
+	return d, D, n, p
 
-    return c, max_c
+def load_orlib_data(filename):
+	try:
+		OR_LIB_FOLDER = "data/or-lib/"
+		f = open(OR_LIB_FOLDER + filename, "rw+")
+		line = f.readline()
+		spl_head = line.split(' ')
+
+		n = int(spl_head[0])
+		p = int(spl_head[2])
+		
+		i = 0
+		d = np.zeros((n,n), dtype = int)
+		max_d = 0
+		D = set()
+		
+		for chunk in iter(lambda: f.readline(), ''):
+			x = chunk.split(' ')
+	        
+			for j in range(0, len(x)):
+				d[i][j] = int(x[j])
+				D.add(d[i][j])
+				max_d = max(d[i][j], max_d)
+			
+			i = i+1
+
+		f.close()
+
+		print f.name, 'n =', n, 'p =', p
+
+	except ValueError:
+		print "Error in output saving."
+	return d, D, n, p
 
 if __name__ == "__main__":
 	random.seed(67)
-	n = 200
-	d, max_c = make_data(n)
-	p = 2
+	
+	#d, D, n, p = load_random_euclidean_data()
+	d, D, n, p = load_orlib_data("pmed1.in")
+	
 	m = n
 	
 	start = time.time()
 	ub0 = get_ub0(d)
-	D = set()
-	
-    # creating D list    
-	for i in range(0, len(d)):
-    # update len(d) if M != N
-		for j in range(0, len(d)):
-			D.add(d[i,j])
-
 	s = sorted(D)
-	bsearch(len(d), len(d), p, ub0, s, d)
+	bsearch(n, m, p, ub0, s, d)
 
 	print 'time =', time.time() - start
